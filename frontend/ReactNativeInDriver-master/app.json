@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "InDriverReactNative",
+    "slug": "InDriverReactNative",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "La app requiere acceder a tu galeria de fotos.",
+          "cameraPermission": "La app requiere acceder a tu camara."
+        }
+      ]
+    ],
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Esta app utiliza tu ubicacion para mostrarte tu posicion en el mapa"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "POST_NOTIFICATIONS"
+      ],
+      "softwareKeyboardLayoutMode": "pan",
+      "package": "com.anonymous.InDriverReactNative"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
