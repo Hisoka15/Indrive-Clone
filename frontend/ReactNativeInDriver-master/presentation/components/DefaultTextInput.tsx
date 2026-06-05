@@ -14,10 +14,10 @@ interface Props {
     fontSize?: number
 }
 
-const DefaultTextInput = ({
-    placeholder,
-    value,
-    onChangeText,
+const DefaultTextInput = ({ 
+    placeholder, 
+    value, 
+    onChangeText, 
     keyboardType = 'default',
     icon,
     secureTextEntry = false,
@@ -28,24 +28,24 @@ const DefaultTextInput = ({
     fontSize = 18
 }: Props) => {
     return (
-        <View style={{ ...styles.containerTextInput, marginHorizontal: marginHorizontal }}>
+    <View style={{...styles.containerTextInput, marginHorizontal:marginHorizontal }}>
 
-            <Image
-                style={styles.textInputIcon}
-                source={icon}
-            />
+        <Image 
+            style={styles.textInputIcon}
+            source={ icon }
+        />
 
-            <TextInput
-                style={{ ...styles.textInput, color: textColor, borderBottomColor: borderBottomColor, fontSize: fontSize }}
-                placeholder={placeholder}
-                placeholderTextColor={placeholderTextColor}
-                value={value}
-                onChangeText={text => onChangeText(text)}
-                keyboardType={keyboardType}
-                secureTextEntry={secureTextEntry}
-            />
+        <TextInput 
+            style={{...styles.textInput, color: textColor,  borderBottomColor: borderBottomColor, fontSize: fontSize}}
+            placeholder={placeholder}
+            placeholderTextColor={placeholderTextColor}
+            value={ value }
+            onChangeText={ text => onChangeText(text) }
+            keyboardType={ keyboardType }
+            secureTextEntry={ secureTextEntry }
+        />
 
-        </View>
+    </View>
     )
 }
 
@@ -58,17 +58,17 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: 15,
         borderBottomRightRadius: 15,
         paddingHorizontal: 15
-    },
-    textInput: {
+      },
+      textInput: {
         width: '90%',
         height: 50,
         // borderBottomWidth: 1,
-    },
-    textInputIcon: {
+      },
+      textInputIcon: {
         width: 25,
         height: 25,
         marginRight: 15,
-    },
+      },
 })
 
 export default DefaultTextInput;

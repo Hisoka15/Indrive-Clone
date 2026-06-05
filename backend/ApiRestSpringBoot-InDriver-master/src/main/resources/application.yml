@@ -12,6 +12,7 @@ spring:
     password: KaliLinux2002
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -24,8 +25,10 @@ socket:
   host: 0.0.0.0
   port: 9092
 
-distance:
-  provider: osrm
-  osrm:
-    base-url: https://router.project-osrm.org
-    timeout: 10000
+google:
+  api:
+    key: AIzaSyD8OOkOGqBwmR68PhD3m-jv6jj2I34z4aM
+
+
+
+

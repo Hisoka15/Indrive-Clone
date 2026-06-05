@@ -15,6 +15,9 @@
         }
       ]
     ],
+    "extra": {
+      "googleMapsApiKey": "AIzaSyD8OOkOGqBwmR68PhD3m-jv6jj2I34z4aM"
+    },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -24,6 +27,9 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Esta app utiliza tu ubicacion para mostrarte tu posicion en el mapa"
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyD8OOkOGqBwmR68PhD3m-jv6jj2I34z4aM"
       }
     },
     "android": {
@@ -37,7 +43,11 @@
         "ACCESS_BACKGROUND_LOCATION",
         "POST_NOTIFICATIONS"
       ],
-      "softwareKeyboardLayoutMode": "pan",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyD8OOkOGqBwmR68PhD3m-jv6jj2I34z4aM"
+        }
+      },
       "package": "com.anonymous.InDriverReactNative"
     },
     "web": {

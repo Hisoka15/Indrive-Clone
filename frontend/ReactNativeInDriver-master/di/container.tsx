@@ -10,14 +10,14 @@ import { SaveAuthSessionUseCase } from "../domain/useCases/auth/SaveAuthSessionU
 import { GetAuthSessionUseCase } from "../domain/useCases/auth/GetAuthSessionUseCase";
 import { RemoveAuthSessionUseCase } from "../domain/useCases/auth/RemoveAuthSessionUseCase";
 import { AuthUseCases } from "../domain/useCases/auth/AuthUseCases";
-import { OpenStreetPlacesService } from "../data/sources/remote/services/OpenStreetPlacesService";
-import { OpenStreetPlacesRepository } from '../domain/repository/OpenStreetPlacesRepository';
-import { OpenStreetPlacesRepositoryImpl } from '../data/repository/OpenStreetPlacesRepositoryImpl';
-import { GetPlaceDetailsUseCase } from "../domain/useCases/openStreetPlaces/GetPlaceDetailsUseCase";
-import { OpenStreetPlacesUseCases } from "../domain/useCases/openStreetPlaces/OpenStreetPlacesUseCases";
+import { GooglePlacesService } from "../data/sources/remote/services/GooglePlacesService";
+import { GooglePlacesRepository } from '../domain/repository/GooglePlacesRepository';
+import { GooglePlacesRepositoryImpl } from '../data/repository/GooglePlacesRepositoryImpl';
+import { GetPlaceDetailsUseCase } from "../domain/useCases/googlePlaces/GetPlaceDetailsUseCase";
+import { GooglePlacesUseCases } from "../domain/useCases/googlePlaces/GooglePlacesUseCases";
 import { ClientSerchMapViewModel } from "../presentation/screens/client/searchMap/ClientSearchMapViewModel";
-import { GetPlaceDetailsByCoordsUseCase } from "../domain/useCases/openStreetPlaces/GetPlaceDetailsByCoordsUseCase";
-import { GetDirectionsUseCase } from "../domain/useCases/openStreetPlaces/GetDirectionsUseCase";
+import { GetPlaceDetailsByCoordsUseCase } from "../domain/useCases/googlePlaces/GetPlaceDetailsByCoordsUseCase";
+import { GetDirectionsUseCase } from "../domain/useCases/googlePlaces/GetDirectionsUseCase";
 import { ClientRequestService } from '../data/sources/remote/services/ClientRequestService';
 import { ClientRequestRepositoryImpl } from "../data/repository/ClientRequestRepositoryImpl";
 import { GetTimeAndDistanceUseCase } from "../domain/useCases/clientRequest/GetTimeAndDistanceUseCase";
@@ -69,17 +69,17 @@ const container = createContainer();
 container.register({
     // SERVICES
     authService: asClass(AuthService).singleton(),
-    openStreetPlacesService: asClass(OpenStreetPlacesService).singleton(),
+    googlePlacesService: asClass(GooglePlacesService).singleton(),
     localStorage: asClass(LocalStorage).singleton(),
     clientRequestService: asClass(ClientRequestService).singleton(),
     userService: asClass(UserService).singleton(),
     driverPositionService: asClass(DriverPositionService).singleton(),
     driverTripOfferService: asClass(DriverTripOfferService).singleton(),
     driverCarInfoService: asClass(DriverCarInfoService).singleton(),
-
+    
     // REPOSITORY
     authRepository: asClass(AuthRepositoryImpl).singleton(),
-    openStreetPlacesRepository: asClass(OpenStreetPlacesRepositoryImpl).singleton(),
+    googlePlacesRepository: asClass(GooglePlacesRepositoryImpl).singleton(),
     clientRequestRepository: asClass(ClientRequestRepositoryImpl).singleton(),
     userRepository: asClass(UserRepositoryImpl).singleton(),
     driverPositionRepository: asClass(DriverPositionRepositoryImpl).singleton(),
@@ -93,10 +93,10 @@ container.register({
     getAuthSessionUseCase: asClass(GetAuthSessionUseCase).singleton(),
     removeAuthSessionUseCase: asClass(RemoveAuthSessionUseCase).singleton(),
     authUseCases: asClass(AuthUseCases).singleton(),
-    getPlaceDetails: asClass(GetPlaceDetailsUseCase).singleton(),
-    getPlaceDetailsByCoords: asClass(GetPlaceDetailsByCoordsUseCase).singleton(),
-    getDirections: asClass(GetDirectionsUseCase).singleton(),
-    openStreetPlacesUseCases: asClass(OpenStreetPlacesUseCases).singleton(),
+    getPlaceDetailsUseCase: asClass(GetPlaceDetailsUseCase).singleton(),
+    getPlaceDetailsByCoordsUseCase: asClass(GetPlaceDetailsByCoordsUseCase).singleton(),
+    getDirectionsUseCase: asClass(GetDirectionsUseCase).singleton(),
+    googlePlacesUseCases: asClass(GooglePlacesUseCases).singleton(),
     getTimeAndDistanceUseCase: asClass(GetTimeAndDistanceUseCase).singleton(),
     // CLIENT REQUEST
     clientRequestUseCases: asClass(ClientRequestUseCases).singleton(),
@@ -121,7 +121,7 @@ container.register({
     // DRIVER TRIP OFFER
     driverTripOfferUseCases: asClass(DriverTripOfferUseCases).singleton(),
     createDriverTripOfferUseCase: asClass(CreateDriverTripOfferUseCase).singleton(),
-    getDriverTripOffersUseCase: asClass(GetDriverTripOffersUseCase).singleton(),
+    getDriverTripOffersUseCase:asClass(GetDriverTripOffersUseCase).singleton(),
     // DRIVER CAR INFO
     driverCarInfoUseCases: asClass(DriverCarInfoUseCases).singleton(),
     createDriverCarInfoUseCase: asClass(CreateDriverCarInfoUseCase).singleton(),

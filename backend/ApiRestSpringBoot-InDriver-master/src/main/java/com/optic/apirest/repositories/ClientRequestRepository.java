@@ -1,15 +1,21 @@
 package com.optic.apirest.repositories;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.optic.apirest.config.APIConfig;
 import com.optic.apirest.dto.client_request.*;
-import com.optic.apirest.services.distance.DistanceService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Repository
 public class ClientRequestRepository {
@@ -17,8 +23,8 @@ public class ClientRequestRepository {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private DistanceService distanceService;
+    @Value("${google.api.key}")
+    private String googleApiKey;
 
     public boolean findById(Long id) {
         String sql = "SELECT COUNT(*) FROM client_requests WHERE id = ?";
@@ -70,7 +76,7 @@ public class ClientRequestRepository {
                 destinationLng, destinationLat
         );
 
-        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class); // ID
     }
 
     public List<NearbyClientRequestResponse> findNearbyClientRequest(double driverLat, double driverLng) {
@@ -139,40 +145,54 @@ public class ClientRequestRepository {
                 throw new RuntimeException("Error al deseralizar JSON NearbyClientRequestResponse", e);
             }
 
-        });
 
+        });
         if (!data.isEmpty()) {
             try {
-                for (NearbyClientRequestResponse nearbyRequest : data) {
-                    DistanceMatrixResponse distanceResponse = distanceService.calculateDistance(
-                            driverLat,
-                            driverLng,
-                            nearbyRequest.getPickupPosition().getY(),
-                            nearbyRequest.getPickupPosition().getX()
-                    );
+                String origins = driverLat + "," + driverLng;
+                String destinations = data.stream()
+                        .map(d -> d.getPickupPosition().getY() + "," + d.getPickupPosition().getX())
+                        .collect(Collectors.joining("|"));
 
-                    NearbyClientRequestResponse.GoogleDistanceMatrixDTO osrmDTO =
-                            new NearbyClientRequestResponse.GoogleDistanceMatrixDTO();
-                    osrmDTO.setStatus("OK");
+                URI uri = UriComponentsBuilder
+                        .fromUriString("https://maps.googleapis.com/maps/api/distancematrix/json")
+                        .queryParam("origins", origins)
+                        .queryParam("destinations", destinations)
+                        .queryParam("units", "metric")
+                        .queryParam("mode", "driving")
+                        .queryParam("key", googleApiKey)
+                        .build()
+                        .toUri();
+                RestTemplate restTemplate = new RestTemplate();
+                ResponseEntity<JsonNode> response = restTemplate.getForEntity(uri, JsonNode.class);
+                JsonNode elements = response.getBody().get("rows").get(0).get("elements");
 
-                    osrmDTO.setDistance(new NearbyClientRequestResponse.GoogleDistanceMatrixDTO.ValueText(
-                            distanceResponse.getDistance().getText(),
-                            distanceResponse.getDistance().getValue()
-                    ));
+                for (int i = 0; i < data.size(); i++) {
+                    JsonNode element = elements.get(i);
+                    NearbyClientRequestResponse.GoogleDistanceMatrixDTO googleDTO = new NearbyClientRequestResponse.GoogleDistanceMatrixDTO();
+                    googleDTO.setStatus(element.get("status").asText());
 
-                    osrmDTO.setDuration(new NearbyClientRequestResponse.GoogleDistanceMatrixDTO.ValueText(
-                            distanceResponse.getDuration().getText(),
-                            distanceResponse.getDuration().getValue()
-                    ));
+                    if (element.has("distance") && !element.get("distance").isNull()) {
+                        googleDTO.setDistance(new NearbyClientRequestResponse.GoogleDistanceMatrixDTO.ValueText(
+                                element.get("distance").get("text").asText(),
+                                element.get("distance").get("value").asDouble()
+                        ));
+                    }
 
-                    nearbyRequest.setGoogleDistanceMatrix(osrmDTO);
+                    if (element.has("duration") && !element.get("duration").isNull()) {
+                        googleDTO.setDuration(new NearbyClientRequestResponse.GoogleDistanceMatrixDTO.ValueText(
+                                element.get("duration").get("text").asText(),
+                                element.get("duration").get("value").asDouble()
+                        ));
+                    }
+
+                    data.get(i).setGoogleDistanceMatrix(googleDTO);
                 }
 
             } catch (Exception e) {
-                throw new RuntimeException("Error al obtener datos de OSRM", e);
+                throw new RuntimeException("Error al obtener datos del API Google Distance Matrix");
             }
         }
-
         return data;
     }
 
@@ -268,6 +288,7 @@ public class ClientRequestRepository {
             } catch (JsonProcessingException e) {
                 throw new RuntimeException("Error al deseralizar JSON NearbyClientRequestResponse", e);
             }
+
 
         });
 
@@ -370,6 +391,7 @@ public class ClientRequestRepository {
                 throw new RuntimeException("Error al deseralizar JSON NearbyClientRequestResponse", e);
             }
 
+
         });
 
         return data;
@@ -470,6 +492,7 @@ public class ClientRequestRepository {
             } catch (JsonProcessingException e) {
                 throw new RuntimeException("Error al deseralizar JSON NearbyClientRequestResponse", e);
             }
+
 
         });
 

@@ -3,9 +3,12 @@ import styles from './Styles';
 import { useEffect, useRef, useState } from "react";
 import MapView, { Camera, LatLng, Marker, Polyline, Region } from "react-native-maps";
 import * as Location from 'expo-location';
+import { GooglePlacesAutocomplete, GooglePlacesAutocompleteRef } from "react-native-google-places-autocomplete";
 import { container } from "../../../../di/container";
-import { OpenStreetPlaceDetail, OSMRouteResponse } from "../../../../data/sources/remote/services/OpenStreetMapService";
+import { PlaceDetail } from "../../../../domain/models/PlaceDetail";
+import { GoogleMapsApiKey } from "../../../../data/sources/remote/api/GoogleMapsApiKey";
 import { ClientSerchMapViewModel } from "./ClientSearchMapViewModel";
+import { decode } from "@googlemaps/polyline-codec";
 import { TimeAndDistanceValues } from '../../../../domain/models/TimeAndDistanceValues';
 import { ErrorResponse } from "../../../../domain/models/ErrorResponse";
 import DefaultTextInput from "../../../components/DefaultTextInput";
@@ -13,27 +16,29 @@ import DefaultRoundedButton from "../../../components/DefaultRoundedButton";
 import { useAuth } from "../../../hooks/useAuth";
 import { DriverTripOffer } from "../../../../domain/models/DriverTripOffer";
 import { DriverOfferItem } from "./DriverOfferItem";
-import { StackScreenProps } from "@react-navigation/stack";
+import {StackScreenProps } from "@react-navigation/stack";
 import { ClientMapStackParamList } from "../../../navigator/ClientMapStackNavigator";
+import mapStyle from '../../../../mapStyle.json';
 import calculateRotation from "../../../utils/CalculateRotation";
 
 
-interface Props extends StackScreenProps<ClientMapStackParamList, 'ClientSearchMapScreen'> { };
+interface Props extends StackScreenProps<ClientMapStackParamList, 'ClientSearchMapScreen'>{};
 export default function ClientSearchMapScreen({ navigation, route }: Props) {
     const viewModel: ClientSerchMapViewModel = container.resolve('clientSearchMapViewModel');
     const { authResponse } = useAuth();
 
+    // LOCALIZACION
     const [location, setLocation] = useState<Region | undefined>(undefined);
     let locationSubscription = useRef<Location.LocationSubscription | null>(null);
     const [driverMarkers, setDriverMarkers] = useState<
-        {
-            id: number;
-            idSocket: string;
-            lat: number;
-            lng: number;
-            animatedPosition: Animated.ValueXY;
-            animatedRotation: Animated.Value;
-        }[]>([]);
+    { 
+        id: number;
+        idSocket: string;
+        lat: number;
+        lng: number;
+        animatedPosition: Animated.ValueXY;
+        animatedRotation: Animated.Value;
+    }[]>([]);
 
     const [directionsRoute, setDirectionsRoute] = useState<LatLng[]>([]);
     const [shouldDrawRoute, setShouldDrawRoute] = useState<boolean>(false);
@@ -45,11 +50,7 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
     const [isDriverOfferModalVisible, setIsDriverOfferModalVisible] = useState(false);
     const [driverTripOffers, setDriverTripOffers] = useState<DriverTripOffer[]>([]);
     const [offer, setOffer] = useState<string>('');
-    const [originSearchText, setOriginSearchText] = useState<string>('');
-    const [destinationSearchText, setDestinationSearchText] = useState<string>('');
-    const [originSearchResults, setOriginSearchResults] = useState<OpenStreetPlaceDetail[]>([]);
-    const [destinationSearchResults, setDestinationSearchResults] = useState<OpenStreetPlaceDetail[]>([]);
-
+    
     const [originPlace, setOriginPlace] = useState<{
         lat: number,
         lng: number,
@@ -57,96 +58,114 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
     } | undefined>(undefined);
 
     const [originMarker, setOriginMarker] = useState<LatLng>();
-
+    
     const [destinationPlace, setDestinationPlace] = useState<{
         lat: number,
         lng: number,
         address: string
     } | undefined>(undefined);
 
+    const placeAutocompleteRef = useRef<GooglePlacesAutocompleteRef>(null);
+    const placeAutocompleteDestinationRef = useRef<GooglePlacesAutocompleteRef>(null);
     const mapRef = useRef<MapView>(null);
     const animatedValue = useRef(new Animated.Value(0)).current;
     const [currentPositions, setCurrentPositions] = useState<Record<string, { lat: number; lng: number }>>({});
 
-
+    
 
     useEffect(() => {
         if (originPlace !== undefined && destinationPlace !== undefined && shouldDrawRoute) {
+            console.log('Ya selecciono los datos de ubicacion');
+            console.log('origin', originPlace);
+            console.log('destination', destinationPlace);
             handleGetDirections();
             handleGetTimeAndDistance();
-        }
+        } 
     }, [originPlace, destinationPlace, shouldDrawRoute])
 
     useEffect(() => {
-        (async () => {
-            let { status } = await Location.requestForegroundPermissionsAsync();
-
-            if (status !== 'granted') {
-                return;
+        (async () => {        
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        console.log('STATUS: ', status);
+        
+        if (status !== 'granted') {
+            console.log('Permiso de ubicacion denegado');
+            return;
+        }
+        if (Platform.OS === 'android') {
+            const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+            if (backgroundStatus !== 'granted') {
+                console.log('Permiso de ubicacion en segundo plano denegado');
             }
-            if (Platform.OS === 'android') {
-                const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-            }
+        }
 
-            startRealTimeLocation();
-            viewModel.initSocket();
-            viewModel.listenerDriversPositionSocket((data: any) => {
-                setDriverMarkers((prevMarkers) => {
-                    const existingMarker = prevMarkers.find(marker => marker.idSocket === data.id_socket);
-                    if (existingMarker) {
-                        const newRotation = calculateRotation(existingMarker.lat, existingMarker.lng, data.lat, data.lng);
-
-                        Animated.timing(existingMarker.animatedPosition, {
-                            toValue: { x: data.lat, y: data.lng },
-                            duration: 1000,
-                            useNativeDriver: false,
-                        }).start();
-
-                        Animated.timing(existingMarker.animatedRotation, {
-                            toValue: newRotation,
-                            duration: 500,
-                            useNativeDriver: false,
-                        }).start();
-
-                        return prevMarkers.map(marker =>
-                            marker.idSocket === data.id_socket
-                                ? { ...marker, lat: data.lat, lng: data.lng }
-                                : marker
-                        );
-                    } else {
-                        return [
-                            ...prevMarkers,
-                            {
-                                id: data.id,
-                                idSocket: data.id_socket,
-                                lat: data.lat,
-                                lng: data.lng,
-                                animatedPosition: new Animated.ValueXY({ x: data.lat, y: data.lng }),
-                                animatedRotation: new Animated.Value(0),
-                            },
-                        ];
-                    }
-                });
-
-                setCurrentPositions(prev => ({
-                    ...prev,
-                    [data.id_socket]: { lat: data.lat, lng: data.lng },
-                }));
+        startRealTimeLocation();
+        viewModel.initSocket();
+        viewModel.listenerDriversPositionSocket((data: any) => {
+            setDriverMarkers((prevMarkers) => {
+                const existingMarker = prevMarkers.find(marker => marker.idSocket === data.id_socket);
+                if (existingMarker) {
+                    const newRotation = calculateRotation(existingMarker.lat, existingMarker.lng, data.lat, data.lng);
+    
+                    Animated.timing(existingMarker.animatedPosition, {
+                        toValue: { x: data.lat, y: data.lng },
+                        duration: 1000,
+                        useNativeDriver: false,
+                    }).start();
+    
+                    Animated.timing(existingMarker.animatedRotation, {
+                        toValue: newRotation,
+                        duration: 500,
+                        useNativeDriver: false,
+                    }).start();
+    
+                    return prevMarkers.map(marker =>
+                        marker.idSocket === data.id_socket
+                            ? { ...marker, lat: data.lat, lng: data.lng }
+                            : marker
+                    );
+                } else {
+                    return [
+                        ...prevMarkers,
+                        {
+                            id: data.id,
+                            idSocket: data.id_socket,
+                            lat: data.lat,
+                            lng: data.lng,
+                            animatedPosition: new Animated.ValueXY({ x: data.lat, y: data.lng }),
+                            animatedRotation: new Animated.Value(0),
+                        },
+                    ];
+                }
             });
-            viewModel.listenerDriversDisconnectedSocket((idSocket: string) => {
-                setDriverMarkers((prevMarkers) => prevMarkers.filter(marker => marker.idSocket !== idSocket));
-            });
-
+    
+            // Actualizar las coordenadas reales con `onAnimatedValueChange`
+            setCurrentPositions(prev => ({
+                ...prev,
+                [data.id_socket]: { lat: data.lat, lng: data.lng },
+            }));
+        });
+        viewModel.listenerDriversDisconnectedSocket((idSocket: string) => {
+            setDriverMarkers((prevMarkers) => prevMarkers.filter(marker => marker.idSocket !== idSocket));
+        });
+        
         })();
     }, [])
-
+    
+    const smoothRotation = (currentAngle: number, newAngle: number) => {
+        const diff = newAngle - currentAngle;
+        if (diff > 180) newAngle -= 360;
+        if (diff < -180) newAngle += 360;
+        return newAngle;
+    };
+    
     const startRealTimeLocation = async () => {
         if (!locationSubscription.current) {
-            locationSubscription.current = await Location.watchPositionAsync(
-                {
-                    accuracy: Location.Accuracy.BestForNavigation,
-                    timeInterval: 1000,
-                    distanceInterval: 1
+            locationSubscription.current= await Location.watchPositionAsync(
+                { 
+                    accuracy: Location.Accuracy.BestForNavigation, 
+                    timeInterval: 1000, 
+                    distanceInterval: 1 
                 },
                 (newLocation) => {
                     setLocation({
@@ -155,9 +174,17 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
                         latitudeDelta: 0.0922,
                         longitudeDelta: 0.0421
                     });
-
+                    
                 }
             );
+        }
+    }
+
+    const stopRealTimeLocation = async () => {
+        console.log('LOCALIZACION DETENIDA');        
+        if (locationSubscription.current) {
+            locationSubscription.current.remove();
+            locationSubscription.current = null;
         }
     }
 
@@ -179,6 +206,7 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
             const response = await viewModel.getDriverTripOffers(data);
             setIsDriverOfferModalVisible(true);
             setDriverTripOffers(response as DriverTripOffer[]);
+            console.log('response DriverTripOffers', response);
         });
     }
 
@@ -202,68 +230,89 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
 
     const handleGetTimeAndDistance = async () => {
         const response: TimeAndDistanceValues | ErrorResponse = await viewModel.getTimeAndDistance(
-            { latitude: originPlace!.lat, longitude: originPlace!.lng },
-            { latitude: destinationPlace!.lat, longitude: destinationPlace!.lng }
+            {
+                latitude: originPlace!.lat,
+                longitude: originPlace!.lng
+            },
+            {
+                latitude: destinationPlace!.lat,
+                longitude: destinationPlace!.lng
+            }
         );
         if ('distance' in response) {
-            setTimeAndDistance(response as TimeAndDistanceValues);
+            const result = response as TimeAndDistanceValues;
+            setTimeAndDistance(result);
+        }
+        else {
+            const error = response as ErrorResponse;
         }
     }
 
     const handleGetDirections = async () => {
-        const response: OSMRouteResponse | null = await viewModel.getDirections(
-            { latitude: originPlace!.lat, longitude: originPlace!.lng },
-            { latitude: destinationPlace!.lat, longitude: destinationPlace!.lng }
+        const response: GoogleDirections | null = await viewModel.getDirections(
+            {
+                latitude: originPlace!.lat,
+                longitude: originPlace!.lng
+            },
+            {
+                latitude: destinationPlace!.lat,
+                longitude: destinationPlace!.lng
+            }
         );
-        if (response !== null && response.routes.length) {
-            setDirectionsRoute([
-                { latitude: originPlace!.lat, longitude: originPlace!.lng },
-                { latitude: destinationPlace!.lat, longitude: destinationPlace!.lng }
-            ]);
-            setOriginMarker({ latitude: originPlace!.lat, longitude: originPlace!.lng });
+        if (response !== null) {
+            if (response.routes.length) {
+                const points = response.routes[0].overview_polyline.points;
+                const coordinates = decode(points).map(([lat, lng]) => ({ latitude: lat, longitude: lng }));
+                setDirectionsRoute(coordinates);
+                setOriginMarker({ latitude:  originPlace!.lat, longitude: originPlace!.lng});
+            }
+        }
+
+    }
+
+    const handleGetPlaceDetails = async (placeId: string, isOrigin: boolean) => {
+        const response: PlaceDetail | null = await viewModel.getPlaceDetails(placeId);
+        if (response !== null) {
+            const lat = response!.result.geometry.location.lat;
+            const lng = response!.result.geometry.location.lng;
+            const address = response!.result.formatted_address;
+            if (isOrigin) {
+                moveCameraToLocation(lat, lng);
+                setOriginPlace({
+                    lat: lat,
+                    lng: lng,                
+                    address: address
+                });
+                setIsOriginModalVisible(false);
+            }
+            else {
+                setDestinationPlace({
+                    lat: lat,
+                    lng: lng,                
+                    address: address
+                });
+                setIsDestinationModalVisible(false);
+            }
+            setShouldDrawRoute(true);
         }
     }
 
-    const handleSearchOrigin = async () => {
-        const results = await viewModel.getPlaceDetails(originSearchText);
-        setOriginSearchResults(results);
-    }
-
-    const handleSelectOrigin = (item: OpenStreetPlaceDetail) => {
-        const lat = parseFloat(item.lat);
-        const lng = parseFloat(item.lon);
-        moveCameraToLocation(lat, lng);
-        setOriginPlace({ lat, lng, address: item.display_name });
-        setIsOriginModalVisible(false);
-        setOriginSearchResults([]);
-        setOriginSearchText('');
-        setShouldDrawRoute(true);
-    }
-
-    const handleSearchDestination = async () => {
-        const results = await viewModel.getPlaceDetails(destinationSearchText);
-        setDestinationSearchResults(results);
-    }
-
-    const handleSelectDestination = (item: OpenStreetPlaceDetail) => {
-        const lat = parseFloat(item.lat);
-        const lng = parseFloat(item.lon);
-        setDestinationPlace({ lat, lng, address: item.display_name });
-        setIsDestinationModalVisible(false);
-        setDestinationSearchResults([]);
-        setDestinationSearchText('');
-        setShouldDrawRoute(true);
-    }
-
     const handleGetPlaceDetailsByCoords = async (lat: number, lng: number) => {
-        const response: OpenStreetPlaceDetail | null = await viewModel.getPlaceDetailsByCoords(lat, lng);
+        const response: PlaceGeocodeDetail | null = await viewModel.getPlaceDetailsByCoords(lat, lng);
         if (response !== null) {
-            setOriginPlace({ lat, lng, address: response.display_name });
+            const address = response.results[0].formatted_address;
+            placeAutocompleteRef.current?.setAddressText(address);
             if (originPlace === undefined) {
                 setShouldDrawRoute(true);
-            } else {
+            }
+            else {
                 setShouldDrawRoute(false);
             }
+            setOriginPlace({
+                lat: lat,
+                lng: lng,                
+                address: address
+            });
         }
     }
 
@@ -275,13 +324,11 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
             useNativeDriver: true
         }).start();
     }
-
+    
     if (!location) {
-        return (
-            <View style={styles.container}>
-                <Text>No se puede obtener la ubicacion revisa los permisos</Text>
-            </View>
-        );
+        return  <View style={styles.container}>
+            <Text>No se puede obtener la ubicacion revisa los permisos</Text>
+        </View>
     }
 
     return (
@@ -297,12 +344,13 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
                     top: 0
                 }}
             >
-                <MapView
+                <MapView 
                     ref={mapRef}
-                    style={{
+                    style={{ 
                         width: '100%',
-                        height: isInteractingWithMap ? Dimensions.get('window').height * 0.87 : Dimensions.get('window').height * 0.64
-                    }}
+                        height: isInteractingWithMap ? Dimensions.get('window').height * 0.87 : Dimensions.get('window').height * 0.64  
+                    }} 
+                    customMapStyle={mapStyle}
                     initialRegion={location}
                     zoomControlEnabled={true}
                     onRegionChangeComplete={(region) => {
@@ -317,11 +365,11 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
                                 inputRange: [0, 360],
                                 outputRange: ['0deg', '360deg'],
                             });
-
+                    
                             const position = currentPositions[driver.idSocket] || { lat: driver.lat, lng: driver.lng };
-
+                    
                             return (
-                                <Marker
+                                <Marker 
                                     key={driver.idSocket}
                                     coordinate={{
                                         latitude: position.lat,
@@ -331,9 +379,9 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
                                     title={`Id Conductor: ${driver.id}`}
                                 >
                                     <Animated.View style={{ transform: [{ rotate: rotateInterpolation }] }}>
-                                        <Image
+                                        <Image 
                                             source={require('../../../../assets/car_yellow.png')}
-                                            style={{ width: 50, height: 50, resizeMode: 'contain' }}
+                                            style={{width: 50, height: 50, resizeMode: 'contain'}}
                                         />
                                     </Animated.View>
                                 </Marker>
@@ -342,17 +390,17 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
                     }
                     {
                         originMarker && (
-                            <Marker
+                            <Marker 
                                 coordinate={{
                                     latitude: originMarker!.latitude,
                                     longitude: originMarker!.longitude
-                                }}
+                                }} 
                                 title="Origen"
                             >
-                                <View style={{ width: 45, height: 45 }}>
-                                    <Image
+                                <View style={{width: 45, height: 45}}>
+                                    <Image 
                                         source={require('../../../../assets/location_white.png')}
-                                        style={{ width: 45, height: 45, resizeMode: 'contain' }}
+                                        style={{width: 45, height: 45, resizeMode: 'contain'}}
                                     />
                                 </View>
                             </Marker>
@@ -360,30 +408,32 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
                     }
                     {
                         destinationPlace && (
-                            <Marker
+                            <Marker 
                                 coordinate={{
                                     latitude: destinationPlace!.lat,
                                     longitude: destinationPlace!.lng
-                                }}
+                                }} 
                                 title="Destino"
                             >
-                                <View style={{ width: 50, height: 50 }}>
-                                    <Image
+                                <View style={{width: 50, height: 50}}>
+                                    <Image 
                                         source={require('../../../../assets/flag_white.png')}
-                                        style={{ width: 50, height: 50, resizeMode: 'contain' }}
+                                        style={{width: 50, height: 50, resizeMode: 'contain'}}
                                     />
                                 </View>
                             </Marker>
                         )
                     }
-                    {
-                        directionsRoute.length > 0 && (<Polyline coordinates={directionsRoute} strokeWidth={6} strokeColor="red" />)
+                    { 
+                        directionsRoute.length > 0 && (<Polyline coordinates={directionsRoute} strokeWidth={6} strokeColor="red"/>)
                     }
-
+                    
+                    
                 </MapView>
             </Animated.View>
-
-            <Animated.View
+        
+        
+        <Animated.View 
                 style={{
                     transform: [
                         { scaleY: animatedValue.interpolate({ inputRange: [0, 1], outputRange: [1, 1] }) },
@@ -399,89 +449,114 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
                     borderTopRightRadius: 25,
                     paddingHorizontal: 15
                 }}
-            >
+        >
+
                 <View style={{ width: '100%', height: '100%' }}>
-                    <TouchableOpacity style={styles.infoContainer} onPress={() => setIsOriginModalVisible(true)}>
+
+                    <TouchableOpacity style={ styles.infoContainer } onPress={() => setIsOriginModalVisible(true)}>
                         <Text>{originPlace?.address ?? 'Recoger en'}</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.infoContainer} onPress={() => setIsDestinationModalVisible(true)}>
-                        <Text>{destinationPlace?.address ?? 'Destino'}</Text>
+                    <TouchableOpacity style={ styles.infoContainer } onPress={() => setIsDestinationModalVisible(true)}>
+                        <Text>{destinationPlace?.address ?? 'Destino'} </Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.infoContainer} onPress={() => setIsOfferModalVisible(true)}>
-                        <Text>{offer === '' ? 'Oferta' : offer}</Text>
+                    <TouchableOpacity style={ styles.infoContainer } onPress={() => setIsOfferModalVisible(true)}>
+                        <Text>{offer === '' ? 'Oferta' : offer} </Text>
                     </TouchableOpacity>
 
-                    <Modal visible={isOriginModalVisible} animationType="slide" transparent={true}>
+                    <Modal 
+                        visible={isOriginModalVisible} 
+                        animationType="slide" 
+                        onRequestClose={() => setIsOriginModalVisible(false)}
+                        transparent={true}
+                        onShow={() => {
+                            placeAutocompleteRef.current?.setAddressText('');
+                            setTimeout(() => {
+                                placeAutocompleteRef.current?.focus();
+                            }, 200);
+                        }}  
+                    >
                         <Pressable style={styles.modalOverlay} onPress={() => setIsOriginModalVisible(false)}>
-                            <Pressable style={styles.modalContent} onPress={() => { }}>
-                                <View style={styles.viewDecoration}>
-                                    <Text style={styles.textDecoration}>Selecciona el lugar de recogida</Text>
-                                </View>
-                                <DefaultTextInput
-                                    icon={require('../../../../assets/location.png')}
-                                    placeholder='Buscar lugar de recogida'
-                                    onChangeText={setOriginSearchText}
-                                    value={originSearchText}
+                            <Pressable style={styles.modalContent} onPress={() => {}}>
+                            <View style={ styles.viewDecoration }>
+                                    <Text style={ styles.textDecoration }>Selecciona el lugar de recogida</Text>
+                            </View>
+                                <GooglePlacesAutocomplete
+                                    ref={placeAutocompleteRef}
+                                    styles={{ container: {width: '100%'} }}
+                                    placeholder="Recoger en"
+                                    onPress={(data, details = null) => {
+                                        if (details !== null) {
+                                            handleGetPlaceDetails(details!.place_id, true);
+                                        }                    
+                                    }}
+                                    query={{
+                                        key: GoogleMapsApiKey,
+                                        language: 'es'
+                                    }}
+                                    debounce={200}
                                 />
-                                <DefaultRoundedButton onPress={handleSearchOrigin} text="Buscar" backgroundColor="black" />
-                                {originSearchResults.length > 0 && (
-                                    <FlatList
-                                        data={originSearchResults}
-                                        keyExtractor={(item) => item.place_id}
-                                        renderItem={({ item }) => (
-                                            <TouchableOpacity
-                                                style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: '#ccc' }}
-                                                onPress={() => handleSelectOrigin(item)}
-                                            >
-                                                <Text>{item.display_name}</Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    />
-                                )}
                             </Pressable>
                         </Pressable>
+                    
                     </Modal>
 
-                    <Modal visible={isDestinationModalVisible} animationType="slide" transparent={true}>
+                    <Modal 
+                        visible={isDestinationModalVisible} 
+                        animationType="slide" 
+                        onRequestClose={() => setIsDestinationModalVisible(false)}
+                        transparent={true}
+                        onShow={() => {
+                            placeAutocompleteDestinationRef.current?.setAddressText('');
+                            setTimeout(() => {
+                                placeAutocompleteDestinationRef.current?.focus();
+                            }, 200);
+                        }}  
+                    >
                         <Pressable style={styles.modalOverlay} onPress={() => setIsDestinationModalVisible(false)}>
-                            <Pressable style={styles.modalContent} onPress={() => { }}>
-                                <View style={styles.viewDecoration}>
-                                    <Text style={styles.textDecoration}>Selecciona el destino</Text>
-                                </View>
-                                <DefaultTextInput
-                                    icon={require('../../../../assets/location.png')}
-                                    placeholder='Buscar destino'
-                                    onChangeText={setDestinationSearchText}
-                                    value={destinationSearchText}
+                            <Pressable style={styles.modalContent} onPress={() => {}}>
+                                <View style={ styles.viewDecoration }>
+                                    <Text style={ styles.textDecoration }>Selecciona el destino</Text>
+                            </View>
+                                <GooglePlacesAutocomplete
+                                    ref={placeAutocompleteDestinationRef}
+                                    styles={{ container: {width: '100%'} }}
+                                    placeholder="Destino"
+                                    onPress={(data, details = null) => {
+                                        if (details !== null) {                        
+                                            handleGetPlaceDetails(details!.place_id, false);
+                                        }                    
+                                    }}
+                                    query={{
+                                        key: GoogleMapsApiKey,
+                                        language: 'es'
+                                    }}
+                                    debounce={200}
                                 />
-                                <DefaultRoundedButton onPress={handleSearchDestination} text="Buscar" backgroundColor="black" />
-                                {destinationSearchResults.length > 0 && (
-                                    <FlatList
-                                        data={destinationSearchResults}
-                                        keyExtractor={(item) => item.place_id}
-                                        renderItem={({ item }) => (
-                                            <TouchableOpacity
-                                                style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: '#ccc' }}
-                                                onPress={() => handleSelectDestination(item)}
-                                            >
-                                                <Text>{item.display_name}</Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    />
-                                )}
                             </Pressable>
                         </Pressable>
+                        
                     </Modal>
 
-                    <Modal visible={isOfferModalVisible} animationType="slide" transparent={true}>
+                    <Modal 
+                        visible={isOfferModalVisible} 
+                        animationType="slide" 
+                        onRequestClose={() => setIsOfferModalVisible(false)}
+                        transparent={true}
+                        onShow={() => {
+                            // placeAutocompleteDestinationRef.current?.setAddressText('');
+                            // setTimeout(() => {
+                            //     placeAutocompleteDestinationRef.current?.focus();
+                            // }, 200);
+                        }}  
+                    >
                         <Pressable style={styles.modalOverlay} onPress={() => setIsOfferModalVisible(false)}>
-                            <Pressable style={styles.modalContent} onPress={() => { }}>
-                                <View style={styles.viewDecoration}>
-                                    <Text style={styles.textDecoration}>Agrega una oferta</Text>
-                                </View>
-                                <DefaultTextInput
+                            <Pressable style={styles.modalContent} onPress={() => {}}>
+                                <View style={ styles.viewDecoration }>
+                                    <Text style={ styles.textDecoration }>Agrega una oferta</Text>
+                            </View>
+                            <DefaultTextInput
                                     icon={require('../../../../assets/dolar.png')}
                                     placeholder='Precio'
                                     onChangeText={setOffer}
@@ -492,34 +567,56 @@ export default function ClientSearchMapScreen({ navigation, route }: Props) {
                                 />
                             </Pressable>
                         </Pressable>
+                        
                     </Modal>
-
-                    <View style={styles.timeAndDistanceView}>
-                        <Text style={styles.timeAndDistanceText}>Precio recomendado: ${timeAndDistance?.recommended_value.toFixed(2)}</Text>
-                        <Text style={styles.timeAndDistanceText}>Tiempo y distance: {timeAndDistance?.duration.text} {timeAndDistance?.distance.text}</Text>
+                    {/* {
+                        timeAndDistance !== undefined    && 
+                        <View style={ styles.timeAndDistanceView }>
+                            <Text style={ styles.timeAndDistanceText}>Precio recomendado: ${timeAndDistance?.recommended_value.toFixed(2)}</Text>
+                            <Text style={ styles.timeAndDistanceText}>Tiempo y distance: {timeAndDistance?.duration.text} {timeAndDistance?.distance.text}</Text>
+                        </View>
+                    } */}
+                    
+                    <View style={ styles.timeAndDistanceView }>
+                        <Text style={ styles.timeAndDistanceText}>Precio recomendado: ${timeAndDistance?.recommended_value.toFixed(2)}</Text>
+                        <Text style={ styles.timeAndDistanceText}>Tiempo y distance: {timeAndDistance?.duration.text} {timeAndDistance?.distance.text}</Text>
                     </View>
 
-                    <DefaultRoundedButton onPress={handleCreateClientRequest} text="Solicitar conductor" backgroundColor="black" />
+                    <DefaultRoundedButton 
+                        onPress={() => {    
+                            handleCreateClientRequest();
+                        }}
+                        text="Solicitar conductor"
+                        backgroundColor="black"
+                    />
                 </View>
-            </Animated.View>
 
-            <Image
+        </Animated.View>
+
+            
+            <Image 
                 style={{
                     height: 50,
                     width: 50,
                     position: 'absolute',
                     top: isInteractingWithMap ? '40%' : '30%'
-                }}
-                source={require('../../../../assets/pin_red.png')}
+                }}            
+                source ={require('../../../../assets/pin_red.png')}
             />
 
-            <Modal visible={isDriverOfferModalVisible} animationType="fade" transparent={true}>
-                <FlatList
+            <Modal 
+                visible={isDriverOfferModalVisible}
+                animationType="fade"
+                onRequestClose={() => setIsDriverOfferModalVisible(false)}
+                transparent={true}
+            >
+                <FlatList 
                     data={driverTripOffers}
                     keyExtractor={(item) => item.id!.toString()}
-                    renderItem={({ item }) => <DriverOfferItem viewModel={viewModel} driverTripOffer={item} navigation={navigation} />}
+                    renderItem={({item}) => <DriverOfferItem viewModel={viewModel} driverTripOffer={item} navigation={navigation}/>}
                 />
             </Modal>
+
         </View>
     );
 }

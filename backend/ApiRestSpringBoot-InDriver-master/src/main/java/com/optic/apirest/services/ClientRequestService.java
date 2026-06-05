@@ -1,17 +1,26 @@
 package com.optic.apirest.services;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.optic.apirest.dto.client_request.*;
 import com.optic.apirest.models.TimeAndDistanceValues;
 import com.optic.apirest.repositories.ClientRequestRepository;
 import com.optic.apirest.repositories.TimeAndDistanceValuesRepository;
-import com.optic.apirest.services.distance.DistanceService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 
 @Service
 public class ClientRequestService {
+
+    @Value("${google.api.key}")
+    private String googleApiKey;
 
     @Autowired
     private TimeAndDistanceValuesRepository timeAndDistanceValuesRepository;
@@ -19,38 +28,75 @@ public class ClientRequestService {
     @Autowired
     private ClientRequestRepository clientRequestRepository;
 
-    @Autowired
-    private DistanceService distanceService;
-
     public Long create(ClientRequestDTO clientRequest) {
         return clientRequestRepository.insertClientRequest(
-                clientRequest.getIdClient(),
-                clientRequest.getFareOffered(),
-                clientRequest.getPickupLat(),
-                clientRequest.getPickupLng(),
-                clientRequest.getDestinationLat(),
-                clientRequest.getDestinationLng(),
-                clientRequest.getPickupDescription(),
-                clientRequest.getDestinationDescription()
+            clientRequest.getIdClient(),
+            clientRequest.getFareOffered(),
+            clientRequest.getPickupLat(),
+            clientRequest.getPickupLng(),
+            clientRequest.getDestinationLat(),
+            clientRequest.getDestinationLng(),
+            clientRequest.getPickupDescription(),
+            clientRequest.getDestinationDescription()
         );
     }
 
-    public DistanceMatrixResponse getTimeAndDistance(double originLat, double originLng,
-                                                     double destinationLat, double destinationLng) {
+
+    public DistanceMatrixResponse getTimeAndDistance(double originLat, double originLng, double destinationLat, double destinationLng) {
 
         TimeAndDistanceValues values = timeAndDistanceValuesRepository.findById(1L).orElseThrow(
                 () -> new RuntimeException("Los precios no han sido establecidos")
         );
 
-        DistanceMatrixResponse responseDTO = distanceService.calculateDistance(
-                originLat, originLng, destinationLat, destinationLng
-        );
+        String origins = originLat + "," + originLng;
+        String destinations = destinationLat + "," + destinationLng;
 
-        double km = responseDTO.getDistance().getValue() / 1000;
-        double minutes = responseDTO.getDuration().getValue() / 60;
-        double recommendedValue = values.getKmValue() * km + values.getMinValue() * minutes;
+        URI uri = UriComponentsBuilder
+                .fromUriString("https://maps.googleapis.com/maps/api/distancematrix/json")
+                .queryParam("origins", origins)
+                .queryParam("destinations", destinations)
+                .queryParam("units", "metric")
+                .queryParam("key", googleApiKey)
+                .build(true)
+                .toUri();
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<JsonNode> response = restTemplate.getForEntity(uri, JsonNode.class);
 
-        responseDTO.setRecommendedValue(recommendedValue);
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("Error al conectarse al API de Google: " + response.getStatusCode());
+        }
+
+        JsonNode body = response.getBody();
+        if (!body.get("status").asText().equals("OK")) {
+            throw new RuntimeException("Respuesta invalida del API de Google: " + body.get("status").asText());
+        }
+        JsonNode element = body.get("rows").get(0).get("elements").get(0);
+
+        String distanceText = element.get("distance").get("text").asText();
+        double distanceValue = element.get("distance").get("value").asDouble();
+
+        String durationText = element.get("duration").get("text").asText();
+        double durationValue = element.get("duration").get("value").asDouble();
+
+        double km = distanceValue / 1000;
+        double minutes = durationValue / 60;
+        double recommededValue = values.getKmValue() * km + values.getMinValue() * minutes;
+
+        DistanceMatrixResponse responseDTO = new DistanceMatrixResponse();
+        responseDTO.setOriginAddresses(body.get("origin_addresses").get(0).asText());
+        responseDTO.setDestinationAddresses(body.get("destination_addresses").get(0).asText());
+
+        DistanceMatrixResponse.Duration duration = new DistanceMatrixResponse.Duration();
+        duration.setText(durationText);
+        duration.setValue(durationValue);
+
+        DistanceMatrixResponse.Distance distance = new DistanceMatrixResponse.Distance();
+        distance.setText(distanceText);
+        distance.setValue(distanceValue);
+
+        responseDTO.setDistance(distance);
+        responseDTO.setDuration(duration);
+        responseDTO.setRecommendedValue(recommededValue);
 
         return responseDTO;
     }
@@ -86,4 +132,5 @@ public class ClientRequestService {
     public boolean updateDriverRating(UpdateDriverRatingDTO request) {
         return clientRequestRepository.updateDriverRating(request);
     }
+
 }

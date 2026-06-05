@@ -4,18 +4,21 @@ import RegisterScreen from "../screens/auth/register/RegisterScreen";
 import { AuthProvider } from "../context/AuthContext";
 import { container } from "../../di/container";
 import RolesScreen from "../screens/roles/RolesScreen";
+import ClientHomeScreen from "../screens/client/home/ClientHomeScreen";
+import DriverHomeScreen from "../screens/driver/home/DriverHomeScreen";
 import { createDrawerNavigator } from "@react-navigation/drawer";
+import ClientSearchMapScreen from "../screens/client/searchMap/ClientSearchMapScreen";
+import DriverMyLocationMapScreen from "../screens/driver/myLocationMap/DriverMyLocationMapScreen";
+import ProfileInfoScreen from "../screens/profile/info/ProfileInfoScreen";
 import { ProfileStackNavigator } from "./ProfileStackNavigator";
+import { DriverClientRequestScreen } from "../screens/driver/clientRequest/DriverClientRequestScreen";
 import { ClientMapStackNavigator } from "./ClientMapStackNavigator";
 import { DriverMapStackNavigator } from "./DriverMapStackNavigator";
 import { ClientTripHistoryScreen } from "../screens/client/tripHistory/ClientTripHistoryScreen";
 import { DriverTripHistoryScreen } from "../screens/driver/tripHistory/DriverTripHistoryScreen";
 import { DriverCarInfoScreen } from "../screens/driver/carInfo/DriverCarInfoScreen";
 import { DriverMapTripStackNavigator } from "./DriverMapTripStackNavigator";
-import { useAuth } from "../hooks/useAuth";
-import { useEffect } from "react";
-import { View, Text } from "react-native";
-import { CommonActions } from "@react-navigation/native";
+import { MaterialIcons } from "@expo/vector-icons";
 
 export type RootStackParamList = {
     LoginScreen: undefined,
@@ -32,7 +35,6 @@ export type RootStackParamList = {
     ClientTripHistoryScreen: undefined,
     DriverTripHistoryScreen: undefined,
     DriverCarInfoScreen: undefined,
-    LogoutScreen: undefined,
 }
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -48,40 +50,59 @@ export const MainStackNavigator = () => {
             <Stack.Navigator>
 
                 <Stack.Screen
-                    options={{ headerShown: false }}
+                    options={{
+                        headerShown: false,
+                    }}
                     name="LoginScreen"
                     component={LoginScreen}
                 />
+
                 <Stack.Screen
-                    options={{ headerShown: false }}
+                    options={{
+                        headerShown: false,
+                    }}
                     name="RegisterScreen"
                     component={RegisterScreen}
                 />
+
                 <Stack.Screen
-                    options={{ headerShown: false }}
+                    options={{
+                        headerShown: false,
+                    }}
                     name="RolesScreen"
                     component={RolesScreen}
                 />
+
+
                 <Stack.Screen
-                    options={{ headerShown: false }}
+                    options={{
+                        headerShown: false,
+                    }}
                     name="ClientHomeScreen"
                     component={ClientDrawerNavigator}
                 />
+
+
                 <Stack.Screen
-                    options={{ headerShown: false }}
+                    options={{
+                        headerShown: false,
+                    }}
                     name="DriverHomeScreen"
                     component={DriverDrawerNavigator}
                 />
 
             </Stack.Navigator>
         </AuthProvider>
+        
     )
+
 }
 
 const ClientDrawerNavigator = () => {
     return (
-        <Drawer.Navigator
+        <Drawer.Navigator 
             initialRouteName="ClientHomeScreen"
+
             screenOptions={{
                 headerStyle: {
                     backgroundColor: 'transparent',
@@ -90,6 +111,10 @@ const ClientDrawerNavigator = () => {
                 },
                 headerTransparent: true,
                 headerTitle: '',
+                
+                // drawerActiveTintColor: 'white',
+                // drawerInactiveTintColor: 'white'
+
             }}
         >
             <Drawer.Screen name="ClientMapStackNavigator" options={{ title: 'Pedir viaje' }} component={ClientMapStackNavigator} />
@@ -101,8 +126,8 @@ const ClientDrawerNavigator = () => {
 
 const DriverDrawerNavigator = () => {
     return (
-        <Drawer.Navigator
-            initialRouteName="DriverMyLocationMapScreen"
+        <Drawer.Navigator 
+            initialRouteName="DriverHomeScreen"
             screenOptions={{
                 headerStyle: {
                     backgroundColor: 'transparent',
@@ -111,36 +136,23 @@ const DriverDrawerNavigator = () => {
                 },
                 headerTransparent: true,
                 headerTitle: '',
+                // headerLeft: () => (
+                //     <MaterialIcons 
+                //         name="menu" 
+                //         size={30} 
+                //         color="red" 
+                //         onPress={() => navigation.toggleDrawer()} 
+                //     />
+                // ),
+                // drawerIcon: ({ color, size }) => (
+                //     <MaterialIcons name="menu" size={size} color="white" /> 
+                // ),
             }}
         >
             <Drawer.Screen name="DriverMyLocationMapScreen" options={{ title: 'Mi Localizacion' }} component={DriverMapTripStackNavigator} />
             <Drawer.Screen name="DriverMapStackNavigator" options={{ title: 'Solicitudes de viaje' }} component={DriverMapStackNavigator} />
             <Drawer.Screen name="DriverTripHistoryScreen" options={{ title: 'Historial de viajes' }} component={DriverTripHistoryScreen} />
             <Drawer.Screen name="DriverCarInfoScreen" options={{ title: 'Datos del vehiculo' }} component={DriverCarInfoScreen} />
-            <Drawer.Screen name="LogoutScreen" options={{ title: ' Cerrar Sesión' }} component={LogoutComponent} />
         </Drawer.Navigator>
     );
 }
-
-const LogoutComponent = ({ navigation }: any) => {
-    const { removeAuthSession } = useAuth();
-
-    useEffect(() => {
-        const logout = async () => {
-            await removeAuthSession();
-            navigation.dispatch(
-                CommonActions.reset({
-                    index: 0,
-                    routes: [{ name: 'LoginScreen' }],
-                })
-            );
-        };
-        logout();
-    }, []);
-
-    return (
-        <View style={{ flex: 1, backgroundColor: 'black', justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ color: 'white' }}>Cerrando sesión...</Text>
-        </View>
-    );
-};

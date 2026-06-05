@@ -17,6 +17,17 @@ public class UserController {
     @Autowired
     private UserService userService;
 
+    // GET - OBTENER
+    // POST - CREAR
+    // PUT - ACTUALIZAR
+    // DELETE - ELIMINAR
+
+//    @PostMapping
+//    public ResponseEntity<UserResponse> create(@RequestBody CreateUserRequest request) {
+//        UserResponse user = userService.create(request);
+//        return ResponseEntity.ok(user);
+//    }
+
     @GetMapping(value = "/{id}")
     public ResponseEntity<?> findById(@PathVariable Long id) {
         try {

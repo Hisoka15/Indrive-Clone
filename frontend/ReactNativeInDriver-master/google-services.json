@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "238946361341",
+    "project_id": "indrive-clone-65cf6",
+    "storage_bucket": "indrive-clone-65cf6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:238946361341:android:1b343620cfcdca1ce0c394",
+        "android_client_info": {
+          "package_name": "com.anonymous.InDriverReactNative"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEO8h9g2Z8ebREDLqnwLGVCVThXIrFdXg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

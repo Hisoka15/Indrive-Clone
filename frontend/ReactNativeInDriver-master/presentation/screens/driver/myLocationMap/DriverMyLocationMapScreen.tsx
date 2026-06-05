@@ -7,6 +7,7 @@ import { DriverMyLocationMapViewModel } from "./DriverMyLocationMapViewModel";
 import { container } from "../../../../di/container";
 import ToggleSwitch from "toggle-switch-react-native";
 import { useAuth } from "../../../hooks/useAuth";
+import mapStyle from '../../../../mapStyle.json';
 import { DriverClientRequestScreen } from "../clientRequest/DriverClientRequestScreen";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp, StackScreenProps } from "@react-navigation/stack";
@@ -17,8 +18,8 @@ import { DriverClientRequestItem } from "../clientRequest/DriverClientRequestIte
 import { DriverClientRequestViewModel } from "../clientRequest/DriverClientRequestViewModel";
 import calculateRotation from "../../../utils/CalculateRotation";
 
-interface Props extends StackScreenProps<DriverMapStackParamList, 'DriverMyLocationMapScreen'> { };
-export default function DriverMyLocationMapScreen({ navigation, route }: Props) {
+interface Props extends StackScreenProps<DriverMapStackParamList, 'DriverMyLocationMapScreen'>{};
+export default function DriverMyLocationMapScreen({navigation, route}: Props) {
 
     const viewModel: DriverMyLocationMapViewModel = container.resolve('driverMyLocationMapViewModel');
     const driverClientRequestViewModel: DriverClientRequestViewModel = container.resolve('driverClientRequestViewModel');
@@ -59,38 +60,38 @@ export default function DriverMyLocationMapScreen({ navigation, route }: Props) 
             else {
                 stopRealTimeLocation();
             }
-
-
+            
+            
         })();
     }, [tracking]);
 
     useEffect(() => {
-        if (location !== undefined) {
-            emitPosition();
-            handleCreateDriverPosition();
-            if (authResponse !== null && authResponse !== undefined && isSocketListenersStarted === false) {
-                setIsSocketListenersStarted(true);
-                handleListenerNewClientRequest({
-                    id_driver: authResponse?.user.id!,
-                    lat: location?.latitude!,
-                    lng: location?.longitude!,
-                });
-                handleListenerNewDriverAssigned();
-            }
+      if (location !== undefined) {
+        emitPosition();
+        handleCreateDriverPosition();
+        if (authResponse !== null && authResponse !== undefined && isSocketListenersStarted === false) {
+            setIsSocketListenersStarted(true);
+            handleListenerNewClientRequest({
+                id_driver: authResponse?.user.id!,
+                lat: location?.latitude!,
+                lng: location?.longitude!,
+            });
+            handleListenerNewDriverAssigned();
         }
+      }
     }, [location]);
 
-
-
+   
+    
 
     const handleListenerNewClientRequest = async (driverPosition: DriverPosition) => {
         console.log('-----LISTENER NEW CLIENT REQUEST-----');
 
         viewModel.listenerNewClientRequestSocket(async (data: any) => {
             console.log('NUEVA SOLICITUD DE CLIENTE');
-
+            
             const response = await viewModel.getNearbyTripRequest({
-                latitude: driverPosition.lat,
+                latitude: driverPosition.lat, 
                 longitude: driverPosition.lng
             });
             setIsClientRequestModalVisible(true);
@@ -107,7 +108,7 @@ export default function DriverMyLocationMapScreen({ navigation, route }: Props) 
             });
         });
     }
-
+    
     const handleCreateDriverPosition = async () => {
         if (authResponse?.user !== null && authResponse?.user !== undefined && location !== null && location !== undefined) {
             const response = await viewModel.createDriverPosition({
@@ -121,33 +122,33 @@ export default function DriverMyLocationMapScreen({ navigation, route }: Props) 
 
     const startRealTimeLocation = async () => {
         if (!locationSubscription.current) {
-            locationSubscription.current = await Location.watchPositionAsync(
-                {
-                    accuracy: Location.Accuracy.BestForNavigation,
-                    timeInterval: 1000,
-                    distanceInterval: 1
+            locationSubscription.current= await Location.watchPositionAsync(
+                { 
+                    accuracy: Location.Accuracy.BestForNavigation, 
+                    timeInterval: 1000, 
+                    distanceInterval: 1 
                 },
                 (newLocation) => {
-
+                     
                     const lat = newLocation.coords.latitude;
                     const lng = newLocation.coords.longitude;
 
                     setDriverMarker((prevMarker) => {
                         if (prevMarker) {
                             const newRotation = calculateRotation(prevMarker.lat, prevMarker.lng, lat, lng);
-
+        
                             Animated.timing(prevMarker.animatedPosition, {
                                 toValue: { x: lat, y: lng },
                                 duration: 1000,
                                 useNativeDriver: false,
                             }).start();
-
+        
                             Animated.timing(prevMarker.animatedRotation, {
                                 toValue: newRotation,
                                 duration: 500,
                                 useNativeDriver: false,
                             }).start();
-
+        
                             return { ...prevMarker, lat: lat, lng: lng };
                         } else {
                             return {
@@ -164,7 +165,7 @@ export default function DriverMyLocationMapScreen({ navigation, route }: Props) 
                         latitudeDelta: 0.0922,
                         longitudeDelta: 0.0421
                     });
-
+                    
                 }
             );
             viewModel.initSocket();
@@ -173,13 +174,13 @@ export default function DriverMyLocationMapScreen({ navigation, route }: Props) 
 
 
     const emitPosition = () => {
-        if (authResponse?.user != null && location !== undefined) {
+        if (authResponse?.user != null && location !== undefined) {            
             viewModel.emitDriverPosition(authResponse?.user.id!, location!.latitude, location!.longitude);
         }
     }
 
     const stopRealTimeLocation = async () => {
-        console.log('LOCALIZACION DETENIDA');
+        console.log('LOCALIZACION DETENIDA');        
         if (locationSubscription.current) {
             viewModel.disconnectSocket();
             locationSubscription.current.remove();
@@ -190,89 +191,90 @@ export default function DriverMyLocationMapScreen({ navigation, route }: Props) 
     if (!location) {
         return <View style={styles.container}>
             <Text>No se puede obtener la ubicacion revisa los permisos</Text>
-        </View>
+         </View>
     }
 
     return (
         <View style={styles.container}>
             <View style={styles.toogleContainer}>
-                <ToggleSwitch
+                <ToggleSwitch             
                     isOn={tracking}
                     onColor="red"
                     offColor="gray"
                     label={tracking ? "Deshabilitar" : "Habilitar"}
-                    onToggle={(isOn) => setTracking(isOn)}
+                    onToggle={(isOn) => setTracking(isOn) }
                 />
             </View>
-
+            
             <MapView
                 style={{
                     width: '100%',
                     height: '100%'
                 }}
+                customMapStyle={mapStyle}
                 initialRegion={location}
                 zoomControlEnabled={true}
             >
-
+               
                 {
                     driverMarker && (
-                        <Marker
-                            coordinate={{
-                                latitude: driverMarker.lat,
-                                longitude: driverMarker.lng,
+                    <Marker 
+                        coordinate={{
+                            latitude: driverMarker.lat,
+                            longitude: driverMarker.lng,
+                        }}
+                        anchor={{ x: 0.5, y: 0.5 }}
+                        title={`TU POSICION`}
+                    >
+                        <Animated.View 
+                            style={{ 
+                                transform: [{ 
+                                    rotate: driverMarker.animatedRotation.interpolate({
+                                        inputRange: [0, 360],
+                                        outputRange: ['0deg', '360deg'],
+                                    })
+                                }] 
                             }}
-                            anchor={{ x: 0.5, y: 0.5 }}
-                            title={`TU POSICION`}
                         >
-                            <Animated.View
-                                style={{
-                                    transform: [{
-                                        rotate: driverMarker.animatedRotation.interpolate({
-                                            inputRange: [0, 360],
-                                            outputRange: ['0deg', '360deg'],
-                                        })
-                                    }]
-                                }}
-                            >
-                                <Image
-                                    source={require('../../../../assets/car_yellow.png')}
-                                    style={{ width: 50, height: 50, resizeMode: 'contain' }}
-                                />
-                            </Animated.View>
-                        </Marker>
+                            <Image 
+                                source={require('../../../../assets/car_yellow.png')}
+                                style={{ width: 50, height: 50, resizeMode: 'contain' }}
+                            />
+                        </Animated.View>
+                    </Marker>
                     )
                 }
 
             </MapView>
-
-            <Modal
-                visible={isClientRequestModalVisible}
-                animationType="fade"
+            
+            <Modal 
+                visible={isClientRequestModalVisible} 
+                animationType="fade" 
                 onRequestClose={() => setIsClientRequestModalVisible(false)}
                 transparent={true}
             >
-                <Pressable
-                    style={styles.modalOverlay}
-                    onPress={() => setIsClientRequestModalVisible(false)}
+                <Pressable 
+                    style={styles.modalOverlay} 
+                    onPress={() => setIsClientRequestModalVisible(false)} // Cierra el modal al tocar fuera de él
                 >
-                    <Pressable style={styles.containerModal} onPress={() => { }}>
-                        <FlatList
+                    <Pressable style={styles.containerModal} onPress={() => {}}>
+                        <FlatList 
                             data={clientRequestResponse}
                             keyExtractor={(item) => item.id.toString()}
-                            keyboardShouldPersistTaps="handled"
-                            renderItem={({ item }) =>
-                                <DriverClientRequestItem
-                                    clientRequestResponse={item}
-                                    viewModel={driverClientRequestViewModel}
-                                    authResponse={authResponse}
+                            keyboardShouldPersistTaps="handled" // Permite que los toques en los elementos pasen correctamente  
+                            renderItem={({item}) =>     
+                                <DriverClientRequestItem 
+                                    clientRequestResponse={item} 
+                                    viewModel={driverClientRequestViewModel} 
+                                    authResponse={authResponse} 
                                 />
-                            }
+                        }
                         />
                     </Pressable>
                 </Pressable>
             </Modal>
 
-
+           
         </View>
     );
 }

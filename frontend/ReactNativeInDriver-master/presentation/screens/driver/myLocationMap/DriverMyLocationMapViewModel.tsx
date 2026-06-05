@@ -1,7 +1,7 @@
 import { Socket } from "socket.io-client";
 import { SocketService } from "../../../../data/sources/remote/services/SocketService";
 import { ClientRequestUseCases } from "../../../../domain/useCases/clientRequest/ClientRequestUseCases";
-import { OpenStreetPlacesUseCases } from "../../../../domain/useCases/openStreetPlaces/OpenStreetPlacesUseCases";
+import { GooglePlacesUseCases } from "../../../../domain/useCases/googlePlaces/GooglePlacesUseCases";
 import LoginScreen from "../../auth/login/LoginScreen";
 import { DriverPosition } from "../../../../domain/models/DriverPosition";
 import { DriverPositionUseCases } from "../../../../domain/useCases/driverPosition/DriverPositionUseCases";
@@ -11,39 +11,42 @@ import { DriverTripOfferUseCases } from "../../../../domain/useCases/driverTripO
 
 export class DriverMyLocationMapViewModel {
 
-    private openStreetPlacesUseCases: OpenStreetPlacesUseCases;
+    private googlePlacesUseCases: GooglePlacesUseCases;
     private clientRequestUseCases: ClientRequestUseCases;
     private driverPositionUseCases: DriverPositionUseCases;
     private socketService: SocketService;
     private driverTripOfferUseCases: DriverTripOfferUseCases;
-
+    
 
     constructor(
         {
-            openStreetPlacesUseCases,
+            googlePlacesUseCases, 
             clientRequestUseCases,
             socketService,
             driverPositionUseCases,
             driverTripOfferUseCases
         }: {
-            openStreetPlacesUseCases: OpenStreetPlacesUseCases,
+            googlePlacesUseCases: GooglePlacesUseCases,
             clientRequestUseCases: ClientRequestUseCases,
             socketService: SocketService,
             driverPositionUseCases: DriverPositionUseCases,
             driverTripOfferUseCases: DriverTripOfferUseCases,
         }
     ) {
-        this.openStreetPlacesUseCases = openStreetPlacesUseCases;
+        this.googlePlacesUseCases = googlePlacesUseCases;
         this.clientRequestUseCases = clientRequestUseCases;
         this.socketService = socketService;
         this.driverPositionUseCases = driverPositionUseCases,
-            this.driverTripOfferUseCases = driverTripOfferUseCases;
+        this.driverTripOfferUseCases = driverTripOfferUseCases;
     }
 
     initSocket() {
         if (!this.socketService.getSocket().connected) {
             this.socketService.getSocket().connect();
         }
+        // this.socketService.onMessage('connect', () => {
+        //     console.log('Conectado a SOCKET IO');
+        // })
     }
 
     emitDriverPosition(id: number, lat: number, lng: number) {
@@ -58,9 +61,10 @@ export class DriverMyLocationMapViewModel {
         this.socketService.disconnect();
     }
 
-    async createDriverPosition(driverPosition: DriverPosition) {
-        return await this.driverPositionUseCases.create.execute(driverPosition);
+    async createDriverPosition(driverPosition: DriverPosition) {        
+        return await this.driverPositionUseCases.create.execute(driverPosition);    
     }
+
 
     async getNearbyTripRequest(driverPosition: LatLng) {
         return this.clientRequestUseCases.getNearbyTripRequest.execute(driverPosition);

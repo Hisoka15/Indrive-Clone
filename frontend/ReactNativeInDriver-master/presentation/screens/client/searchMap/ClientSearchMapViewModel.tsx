@@ -1,6 +1,6 @@
 import { LatLng } from "react-native-maps";
-import { OpenStreetPlaceDetail, OSMRouteResponse } from "../../../../data/sources/remote/services/OpenStreetMapService";
-import { OpenStreetPlacesUseCases } from "../../../../domain/useCases/openStreetPlaces/OpenStreetPlacesUseCases";
+import { PlaceDetail } from "../../../../domain/models/PlaceDetail";
+import { GooglePlacesUseCases } from "../../../../domain/useCases/googlePlaces/GooglePlacesUseCases";
 import { ClientRequestUseCases } from "../../../../domain/useCases/clientRequest/ClientRequestUseCases";
 import { TimeAndDistanceValues } from "../../../../domain/models/TimeAndDistanceValues";
 import { ErrorResponse } from "../../../../domain/models/ErrorResponse";
@@ -11,25 +11,25 @@ import { DriverTripOffer } from "../../../../domain/models/DriverTripOffer";
 
 export class ClientSerchMapViewModel {
 
-    private openStreetPlacesUseCases: OpenStreetPlacesUseCases;
+    private googlePlacesUseCases: GooglePlacesUseCases;
     private clientRequestUseCases: ClientRequestUseCases;
     private driverTripOfferUseCases: DriverTripOfferUseCases;
     private socketService: SocketService;
 
     constructor(
         {
-            openStreetPlacesUseCases,
+            googlePlacesUseCases, 
             clientRequestUseCases,
             socketService,
             driverTripOfferUseCases
         }: {
-            openStreetPlacesUseCases: OpenStreetPlacesUseCases,
+            googlePlacesUseCases: GooglePlacesUseCases,
             clientRequestUseCases: ClientRequestUseCases,
             socketService: SocketService,
             driverTripOfferUseCases: DriverTripOfferUseCases
         }
     ) {
-        this.openStreetPlacesUseCases = openStreetPlacesUseCases;
+        this.googlePlacesUseCases = googlePlacesUseCases;
         this.clientRequestUseCases = clientRequestUseCases;
         this.socketService = socketService;
         this.driverTripOfferUseCases = driverTripOfferUseCases;
@@ -39,8 +39,11 @@ export class ClientSerchMapViewModel {
         if (!this.socketService.getSocket().connected) {
             this.socketService.getSocket().connect();
         }
+        // this.socketService.onMessage('connect', () => {
+        //     console.log('Conectado a SOCKET IO');
+        // })
     }
-
+    
     async createClientRequest(clientRequest: ClientRequest) {
         return await this.clientRequestUseCases.create.execute(clientRequest);
     }
@@ -49,20 +52,20 @@ export class ClientSerchMapViewModel {
         return await this.clientRequestUseCases.updateDriverAssigned.execute(idClientRequest, idDriver, fareAssigned);
     }
 
-    async getPlaceDetails(query: string): Promise<OpenStreetPlaceDetail[]> {
-        return await this.openStreetPlacesUseCases.getPlaceDetails.execute(query);
+    async getPlaceDetails(placeId: string): Promise<PlaceDetail | null> {
+        return await this.googlePlacesUseCases.getPlaceDetails.execute(placeId);
     }
 
     async getDriverTripOffers(idClientRequest: number): Promise<DriverTripOffer[] | ErrorResponse> {
         return await this.driverTripOfferUseCases.getDriverTripOffers.execute(idClientRequest);
     }
 
-    async getPlaceDetailsByCoords(lat: number, lng: number): Promise<OpenStreetPlaceDetail | null> {
-        return await this.openStreetPlacesUseCases.getPlaceDetailsByCoords.execute(lat, lng);
+    async getPlaceDetailsByCoords(lat: number, lng: number): Promise<PlaceGeocodeDetail | null> {
+        return await this.googlePlacesUseCases.getPlaceDetailsByCoords.execute(lat, lng);
     }
 
-    async getDirections(origin: LatLng, destination: LatLng): Promise<OSMRouteResponse | null> {
-        return await this.openStreetPlacesUseCases.getDirections.execute(origin, destination);
+    async getDirections(origin: LatLng, destination: LatLng): Promise<GoogleDirections | null> {
+        return await this.googlePlacesUseCases.getDirections.execute(origin, destination);
     }
 
     async getTimeAndDistance(origin: LatLng, destination: LatLng): Promise<TimeAndDistanceValues | ErrorResponse> {
@@ -84,6 +87,7 @@ export class ClientSerchMapViewModel {
 
     listenerDriversPositionSocket(callback: (data: any) => void) {
         this.socketService.onMessage('new_driver_position', (data: any) => {
+            // console.log('NUEVO CONDUCTOR', data);
             callback(data);
         })
     }
@@ -98,6 +102,7 @@ export class ClientSerchMapViewModel {
 
     listenerNewDriverOffer(idClientRequest: number, callback: (data: any) => void) {
         this.socketService.onMessage(`created_driver_offer/${idClientRequest}`, (data: any) => {
+            // console.log('NUEVO CONDUCTOR', data);
             callback(idClientRequest);
         })
     }

@@ -12,6 +12,13 @@ const ApiRequestHandler = axios.create({
     }
 });
 
+const GoogleApiRequestHandler = axios.create({
+    baseURL: "https://maps.googleapis.com/maps/api",
+    headers: {
+        'Content-Type': 'application/json'
+    }
+});
+
 ApiRequestHandler.interceptors.request.use(
     async (config) => {
         const data = await new LocalStorage().getItem('auth');
@@ -23,4 +30,5 @@ ApiRequestHandler.interceptors.request.use(
     }
 )
 
-export { ApiRequestHandler }
+
+export { ApiRequestHandler, GoogleApiRequestHandler }
